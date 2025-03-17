@@ -7,6 +7,6 @@
 ]]
 CreateThread(function() Config.LoadPlugin("ersintegration", function(pluginConfig)
     RegisterNetEvent('night_ers:ERS_GetPedDataFromServer_cb', function(data)
-        TriggerServerEvent('SonoranCAD::ErsIntegration::BuildChars')
+        TriggerServerEvent('SonoranCAD::ErsIntegration::BuildChars', data)
     end)
 end) end)

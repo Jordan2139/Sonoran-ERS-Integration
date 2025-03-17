@@ -10,10 +10,11 @@ local pluginConfig = Config.GetPluginConfig("ersintegration")
 if pluginConfig.enabled then
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutOffered')
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutAccepted')
-    RegisterNetEvent('night_ers:ERS_GetPedDataFromServer_cb')
+    RegisterNetEvent('SonoranCAD::ErsIntegration::BuildChars')
     local processedCalloutOffered = {}
     local processedCalloutAccepted = {}
     local processedPedData = {}
+    local ersCallouts = {}
     local function generateUniqueCalloutKey(callout)
         return string.format(
             "%s_%s_%s_%s_%.2f_%.2f_%.2f",
@@ -163,7 +164,7 @@ if pluginConfig.enabled then
                 end)
             end
         end)
-        AddEventHandler('night_ers:ERS_GetPedDataFromServer_cb', function(pedData)
+        AddEventHandler('SonoranCAD::ErsIntegration::BuildChars', function(pedData)
             local uniqueKey = generateUniquePedDataKey(pedData)
             if processedPedData[uniqueKey] then
                 debugPrint("Ped " .. pedData.FirstName .. " " .. pedData.LastName .. " already processed. Skipping 911 call.")
@@ -184,6 +185,22 @@ if pluginConfig.enabled then
                 else
                     debugPrint("Failed to extract recordId from response: " .. response)
                 end
+            end)
+        end)
+        CreateThread(function()
+            Wait(5000)
+            debugPrint('Loading ERS Callouts...')
+            local calloutData = exports.night_ers.getCallouts()
+            for uid, callout in pairs(calloutData) do
+                ersCallouts[uid] = callout
+            end
+            local data = {
+                ['serverId'] = Config.serverId,
+                ['callouts'] = {ersCallouts}
+            }
+            debugPrint('Loaded ' .. #ersCallouts .. ' ERS callouts.')
+            performApiRequest(data, 'ERS_CALLS', function(response)
+                debugPrint('ERS callouts sent to CAD.')
             end)
         end)
     end
