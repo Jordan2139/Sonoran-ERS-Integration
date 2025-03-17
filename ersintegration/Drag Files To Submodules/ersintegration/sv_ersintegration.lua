@@ -10,8 +10,10 @@ local pluginConfig = Config.GetPluginConfig("ersintegration")
 if pluginConfig.enabled then
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutOffered')
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutAccepted')
+    RegisterNetEvent('night_ers:ERS_GetPedDataFromServer_cb')
     local processedCalloutOffered = {}
     local processedCalloutAccepted = {}
+    local processedPedData = {}
     local function generateUniqueCalloutKey(callout)
         return string.format(
             "%s_%s_%s_%s_%.2f_%.2f_%.2f",
@@ -22,6 +24,15 @@ if pluginConfig.enabled then
             callout.Coordinates.x,
             callout.Coordinates.y,
             callout.Coordinates.z
+        )
+    end
+    local function generateUniquePedDataKey(pedData)
+        return string.format(
+            "%s_%s_%s_%s",
+            pedData.uniqueId,
+            pedData.FirstName,
+            pedData.LastName,
+            pedData.Address
         )
     end
     function generateCallNote(callout)
@@ -52,6 +63,20 @@ if pluginConfig.enabled then
         return note
     end
 
+    function generateReplaceValues(pedData, config)
+        local replaceValues = {}
+        for cadKey, source in pairs(config) do
+            if type(source) == "function" then
+                replaceValues[cadKey] = source(pedData)
+            elseif type(source) == "string" then
+                replaceValues[cadKey] = pedData[source]
+            else
+                error("Invalid mapping configuration for key: " .. tostring(cadKey))
+            end
+        end
+        return replaceValues
+    end
+
     if pluginConfig.create911Call then
         AddEventHandler('SonoranCAD::ErsIntegration::CalloutOffered', function(calloutData)
             local uniqueKey = generateUniqueCalloutKey(calloutData)
@@ -67,7 +92,21 @@ if pluginConfig.enabled then
             if calloutData.VehiclePlate ~= nil then
                 plate = calloutData.VehiclePlate
             end
-            exports['sonorancad']:call911(caller, location, description, postal, plate, function(_)end)
+            local data = {
+                ['serverId'] = Config.serverId,
+                ['isEmergency'] = true,
+                ['caller'] = caller,
+                ['location'] = location,
+                ['description'] = description,
+                ['metaData'] = {
+                    ['x'] = calloutData.Coordinates.x,
+                    ['y'] = calloutData.Coordinates.y,
+                    ['plate'] = plate,
+                    ['postal'] = postal
+                }
+            }
+            performApiRequest({data}, 'CALL_911', function(response)
+            end)
             processedCalloutOffered[uniqueKey] = true
         end)
     end
@@ -85,7 +124,7 @@ if pluginConfig.enabled then
                         ['callId'] = callId,
                         ['units'] = {unitId}
                     }
-                    performApiRequest(data, 'ATTACH_UNIT', function(response)
+                    performApiRequest({data}, 'ATTACH_UNIT', function(response)
                         debugPrint("Added unit to call: " .. response)
                     end)
                 end
@@ -106,7 +145,11 @@ if pluginConfig.enabled then
                     ['code'] = callCode,
                     ['description'] = calloutData.Description,
                     ['units'] = {unitId},
-                    ['notes'] = generateCallNote(calloutData) -- required
+                    ['notes'] = generateCallNote(calloutData), -- required
+                    ['metaData'] = {
+                        ['x'] = calloutData.Coordinates.x,
+                        ['y'] = calloutData.Coordinates.y
+                    }
                 }
                 performApiRequest({data}, 'NEW_DISPATCH', function(response)
                     local callId = response:match("ID: {?(%w+)}?")
@@ -119,6 +162,29 @@ if pluginConfig.enabled then
                     end
                 end)
             end
+        end)
+        AddEventHandler('night_ers:ERS_GetPedDataFromServer_cb', function(pedData)
+            local uniqueKey = generateUniquePedDataKey(pedData)
+            if processedPedData[uniqueKey] then
+                debugPrint("Ped " .. pedData.FirstName .. " " .. pedData.LastName .. " already processed. Skipping 911 call.")
+                return
+            end
+            local data = {
+                ['user'] = '000-000-0000',
+                ['useDictionary'] = true,
+                ['recordTypeId'] = pluginConfig.customRecords.civilianRecordID,
+            }
+            data.replaceValues = generateReplaceValues(pedData, pluginConfig.customRecords.civilianValues)
+            performApiRequest({data}, 'NEW_RECORD', function(response)
+                local recordId = response:match("ID: {?(%w+)}?")
+                if recordId then
+                    -- Save the recordId in the processedPedData table using the unique key
+                    processedPedData[uniqueKey] = recordId
+                    debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
+                else
+                    debugPrint("Failed to extract recordId from response: " .. response)
+                end
+            end)
         end)
     end
 end
