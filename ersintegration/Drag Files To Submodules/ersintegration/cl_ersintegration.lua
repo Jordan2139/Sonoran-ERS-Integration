@@ -9,4 +9,7 @@ CreateThread(function() Config.LoadPlugin("ersintegration", function(pluginConfi
     RegisterNetEvent('night_ers:ERS_GetPedDataFromServer_cb', function(data)
         TriggerServerEvent('SonoranCAD::ErsIntegration::BuildChars', data)
     end)
+    RegisterNetEvent('night_ers:receiveVehicleInformation', function(_, data)
+        TriggerServerEvent('SonoranCAD::ErsIntegration::BuildVehs', data)
+    end)
 end) end)

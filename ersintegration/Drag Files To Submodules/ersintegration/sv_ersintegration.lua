@@ -11,6 +11,7 @@ if pluginConfig.enabled then
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutOffered')
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutAccepted')
     RegisterNetEvent('SonoranCAD::ErsIntegration::BuildChars')
+    RegisterNetEvent('SonoranCAD::ErsIntegration::BuildVehs')
     local processedCalloutOffered = {}
     local processedCalloutAccepted = {}
     local processedPedData = {}
@@ -171,11 +172,29 @@ if pluginConfig.enabled then
                 return
             end
             local data = {
-                ['user'] = '000-000-0000',
+                ['user'] = '00000000-0000-0000-0000-000000000000',
                 ['useDictionary'] = true,
                 ['recordTypeId'] = pluginConfig.customRecords.civilianRecordID,
             }
             data.replaceValues = generateReplaceValues(pedData, pluginConfig.customRecords.civilianValues)
+            performApiRequest({data}, 'NEW_RECORD', function(response)
+                local recordId = response:match("ID: {?(%w+)}?")
+                if recordId then
+                    -- Save the recordId in the processedPedData table using the unique key
+                    processedPedData[uniqueKey] = recordId
+                    debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
+                else
+                    debugPrint("Failed to extract recordId from response: " .. response)
+                end
+            end)
+        end)
+        AddEventHandler('SonoranCAD::ErsIntegration::BuildVehs', function(vehData)
+            local data = {
+                ['user'] = '00000000-0000-0000-0000-000000000000',
+                ['useDictionary'] = true,
+                ['recordTypeId'] = pluginConfig.customRecords.vehicleRegistrationRecordID,
+            }
+            data.replaceValues = generateReplaceValues(vehData, pluginConfig.customRecords.vehicleRegistrationValues)
             performApiRequest({data}, 'NEW_RECORD', function(response)
                 local recordId = response:match("ID: {?(%w+)}?")
                 if recordId then
@@ -192,7 +211,11 @@ if pluginConfig.enabled then
             debugPrint('Loading ERS Callouts...')
             local calloutData = exports.night_ers.getCallouts()
             for uid, callout in pairs(calloutData) do
-                ersCallouts[uid] = callout
+                local data = {}
+                data.id = uid
+                data.data = callout
+                table.insert(ersCallouts, data)
+
             end
             local data = {
                 ['serverId'] = Config.serverId,
