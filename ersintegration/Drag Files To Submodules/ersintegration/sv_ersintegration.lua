@@ -16,6 +16,12 @@ if pluginConfig.enabled then
     local processedCalloutAccepted = {}
     local processedPedData = {}
     local ersCallouts = {}
+    --[[
+    @function generateUniqueCalloutKey
+    @param table callout
+    @return string
+    Used to generate the unique key for a callout creation for tracking
+    ]]
     local function generateUniqueCalloutKey(callout)
         return string.format(
             "%s_%s_%s_%s_%.2f_%.2f_%.2f",
@@ -28,6 +34,12 @@ if pluginConfig.enabled then
             callout.Coordinates.z
         )
     end
+    --[[
+    @function generateUniquePedDataKey
+    @param table pedData
+    @return string
+    Used to generate the unique key for a ped data record creation for tracking
+    ]]
     local function generateUniquePedDataKey(pedData)
         return string.format(
             "%s_%s_%s_%s",
@@ -37,6 +49,12 @@ if pluginConfig.enabled then
             pedData.Address
         )
     end
+    --[[
+    @function generateCallNote
+    @param table callout
+    @return string
+    Used to generate the call note for a callout
+    ]]
     function generateCallNote(callout)
         -- Start with basic callout information
         local note = ''
@@ -65,20 +83,29 @@ if pluginConfig.enabled then
         return note
     end
 
-    function generateReplaceValues(pedData, config)
+    --[[
+        @funciton generateReplaceValues
+        @param table data
+        @param table config
+        @return table
+        Generates the replacement values for a record creation based on the passed data and configuration
+    ]]
+    function generateReplaceValues(data, config)
         local replaceValues = {}
         for cadKey, source in pairs(config) do
             if type(source) == "function" then
-                replaceValues[cadKey] = source(pedData)
+                replaceValues[cadKey] = source(data)
             elseif type(source) == "string" then
-                replaceValues[cadKey] = pedData[source]
+                replaceValues[cadKey] = data[source]
             else
                 error("Invalid mapping configuration for key: " .. tostring(cadKey))
             end
         end
         return replaceValues
     end
-
+    --[[
+        911 CALL CREATION
+    ]]
     if pluginConfig.create911Call then
         AddEventHandler('SonoranCAD::ErsIntegration::CalloutOffered', function(calloutData)
             local uniqueKey = generateUniqueCalloutKey(calloutData)
@@ -112,6 +139,9 @@ if pluginConfig.enabled then
             processedCalloutOffered[uniqueKey] = true
         end)
     end
+    --[[
+        EMERGENCY CALL CREATION
+    ]]
     if pluginConfig.createEmergencyCall then
         AddEventHandler('SonoranCAD::ErsIntegration::CalloutAccepted', function(calloutData)
             local uniqueKey = generateUniqueCalloutKey(calloutData)
@@ -165,66 +195,76 @@ if pluginConfig.enabled then
                 end)
             end
         end)
-        AddEventHandler('SonoranCAD::ErsIntegration::BuildChars', function(pedData)
-            local uniqueKey = generateUniquePedDataKey(pedData)
-            if processedPedData[uniqueKey] then
-                debugPrint("Ped " .. pedData.FirstName .. " " .. pedData.LastName .. " already processed. Skipping 911 call.")
-                return
-            end
-            local data = {
-                ['user'] = '00000000-0000-0000-0000-000000000000',
-                ['useDictionary'] = true,
-                ['recordTypeId'] = pluginConfig.customRecords.civilianRecordID,
-            }
-            data.replaceValues = generateReplaceValues(pedData, pluginConfig.customRecords.civilianValues)
-            performApiRequest({data}, 'NEW_RECORD', function(response)
-                local recordId = response:match("ID: {?(%w+)}?")
-                if recordId then
-                    -- Save the recordId in the processedPedData table using the unique key
-                    processedPedData[uniqueKey] = recordId
-                    debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
-                else
-                    debugPrint("Failed to extract recordId from response: " .. response)
-                end
-            end)
-        end)
-        AddEventHandler('SonoranCAD::ErsIntegration::BuildVehs', function(vehData)
-            local data = {
-                ['user'] = '00000000-0000-0000-0000-000000000000',
-                ['useDictionary'] = true,
-                ['recordTypeId'] = pluginConfig.customRecords.vehicleRegistrationRecordID,
-            }
-            data.replaceValues = generateReplaceValues(vehData, pluginConfig.customRecords.vehicleRegistrationValues)
-            performApiRequest({data}, 'NEW_RECORD', function(response)
-                local recordId = response:match("ID: {?(%w+)}?")
-                if recordId then
-                    -- Save the recordId in the processedPedData table using the unique key
-                    processedPedData[uniqueKey] = recordId
-                    debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
-                else
-                    debugPrint("Failed to extract recordId from response: " .. response)
-                end
-            end)
-        end)
-        CreateThread(function()
-            Wait(5000)
-            debugPrint('Loading ERS Callouts...')
-            local calloutData = exports.night_ers.getCallouts()
-            for uid, callout in pairs(calloutData) do
-                local data = {}
-                data.id = uid
-                data.data = callout
-                table.insert(ersCallouts, data)
-
-            end
-            local data = {
-                ['serverId'] = Config.serverId,
-                ['callouts'] = {ersCallouts}
-            }
-            debugPrint('Loaded ' .. #ersCallouts .. ' ERS callouts.')
-            performApiRequest(data, 'ERS_CALLS', function(response)
-                debugPrint('ERS callouts sent to CAD.')
-            end)
-        end)
     end
+    --[[
+        CALLOUT, PED AND VEHICLE DATA CREATION
+    ]]
+    AddEventHandler('SonoranCAD::ErsIntegration::BuildChars', function(pedData)
+        local uniqueKey = generateUniquePedDataKey(pedData)
+        if processedPedData[uniqueKey] then
+            debugPrint("Ped " .. pedData.FirstName .. " " .. pedData.LastName .. " already processed. Skipping 911 call.")
+            return
+        end
+        local data = {
+            ['user'] = '00000000-0000-0000-0000-000000000000',
+            ['useDictionary'] = true,
+            ['recordTypeId'] = pluginConfig.customRecords.civilianRecordID,
+        }
+        data.replaceValues = generateReplaceValues(pedData, pluginConfig.customRecords.civilianValues)
+        performApiRequest({data}, 'NEW_RECORD', function(response)
+            local recordId = response:match("ID: {?(%w+)}?")
+            if recordId then
+                -- Save the recordId in the processedPedData table using the unique key
+                processedPedData[uniqueKey] = recordId
+                debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
+            else
+                debugPrint("Failed to extract recordId from response: " .. response)
+            end
+        end)
+    end)
+    AddEventHandler('SonoranCAD::ErsIntegration::BuildVehs', function(vehData)
+        local data = {
+            ['user'] = '00000000-0000-0000-0000-000000000000',
+            ['useDictionary'] = true,
+            ['recordTypeId'] = pluginConfig.customRecords.vehicleRegistrationRecordID,
+        }
+        data.replaceValues = generateReplaceValues(vehData, pluginConfig.customRecords.vehicleRegistrationValues)
+        performApiRequest({data}, 'NEW_RECORD', function(response)
+            local recordId = response:match("ID: {?(%w+)}?")
+            if recordId then
+                -- Save the recordId in the processedPedData table using the unique key
+                processedPedData[uniqueKey] = recordId
+                debugPrint("Record ID " .. recordId .. " saved for unique key: " .. uniqueKey)
+            else
+                debugPrint("Failed to extract recordId from response: " .. response)
+            end
+        end)
+    end)
+    CreateThread(function()
+        Wait(5000)
+        debugPrint('Loading ERS Callouts...')
+        local calloutData = exports.night_ers.getCallouts()
+        for uid, callout in pairs(calloutData) do
+            local data = {}
+            data.id = uid
+            data.data = callout
+            table.insert(ersCallouts, data)
+
+        end
+        local data = {
+            ['serverId'] = Config.serverId,
+            ['callouts'] = {ersCallouts}
+        }
+        debugPrint('Loaded ' .. #ersCallouts .. ' ERS callouts.')
+        performApiRequest(data, 'ERS_CALLS', function(response)
+            debugPrint('ERS callouts sent to CAD.')
+        end)
+    end)
+    --[[
+        PUSH EVENT HANDLER
+    ]]
+    TriggerServerEvent('SonoranCAD::RegisterPushEvent', 'ERS_CALLOUT', function(data)
+        local calloutData = data.data
+        TriggerEvent('night_ers:requestCallout', calloutData.unitType, calloutData.calloutId, calloutData.options)
+    end)
 end
