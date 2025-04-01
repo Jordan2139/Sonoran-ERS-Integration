@@ -72,6 +72,24 @@ exports('getCallouts', function()
     return jsonReadyTable
 end)
 
+exports('createCallout', function(callout)
+    local newCalloutID = callout .. '-' .. os.time()
+    Config.Callouts[newCalloutID] = Config.Callouts[callout]
+    Config.Callouts[newCalloutID].id = newCalloutID
+    Config.Callouts[newCalloutID].calloutLocations = callout.calloutLocations
+    Config.Callouts[newCalloutID].pedWeaponData = callout.pedWeaponData
+    Config.Callouts[newCalloutID].pedActionOnNoActionFound = callout.pedActionOnNoActionFound
+    Config.Callouts[newCalloutID].pedChanceToFleeFromPlayer = callout.pedChanceToFleeFromPlayer
+    Config.Callouts[newCalloutID].pedChanceToObtainWeapons = callout.pedChanceToObtainWeapons
+    Config.Callouts[newCalloutID].pedChanceToAttackPlayer = callout.pedChanceToAttackPlayer
+    Config.Callouts[newCalloutID].pedChanceToSurrender = callout.pedChanceToSurrender
+    local returnData = {
+        calloutId = newCalloutID,
+        unitType = Config.Callouts[newCalloutID].unitType,
+    }
+    return returnData
+end)
+
 RegisterServerEvent("night_ers:giveAmmo", function(AmmoData)
     local src = source
     if QBCore then

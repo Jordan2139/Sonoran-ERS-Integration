@@ -256,15 +256,21 @@ if pluginConfig.enabled then
             ['callouts'] = {ersCallouts}
         }
         debugPrint('Loaded ' .. #ersCallouts .. ' ERS callouts.')
-        performApiRequest(data, 'ERS_CALLS', function(response)
+        performApiRequest(data, 'SET_AVAILABLE_CALLOUTS', function(response)
             debugPrint('ERS callouts sent to CAD.')
         end)
     end)
     --[[
         PUSH EVENT HANDLER
     ]]
-    TriggerServerEvent('SonoranCAD::RegisterPushEvent', 'ERS_CALLOUT', function(data)
+    TriggerServerEvent('SonoranCAD::RegisterPushEvent', 'EVENT_NEW_CALLOUT', function(data)
         local calloutData = data.data
-        TriggerEvent('night_ers:requestCallout', calloutData.unitType, calloutData.calloutId, calloutData.options)
+        local calloutID = exports.night_ers:createCallout(calloutData)
+        if calloutID then
+            debugPrint("Callout " .. calloutID .. " created.")
+            TriggerEvent('night_ers:requestCallout', calloutID.unitType, calloutID.calloutId)
+        else
+            debugPrint("Failed to create callout.")
+        end
     end)
 end
