@@ -73,19 +73,18 @@ exports('getCallouts', function()
 end)
 
 exports('createCallout', function(callout)
-    local newCalloutID = callout .. '-' .. os.time()
-    Config.Callouts[newCalloutID] = Config.Callouts[callout]
+    local newCalloutID = callout.id .. '-' .. os.time()
+    Config.Callouts[newCalloutID] = Config.Callouts[callout.id]
     Config.Callouts[newCalloutID].id = newCalloutID
-    Config.Callouts[newCalloutID].calloutLocations = callout.calloutLocations
-    Config.Callouts[newCalloutID].pedWeaponData = callout.pedWeaponData
-    Config.Callouts[newCalloutID].pedActionOnNoActionFound = callout.pedActionOnNoActionFound
-    Config.Callouts[newCalloutID].pedChanceToFleeFromPlayer = callout.pedChanceToFleeFromPlayer
-    Config.Callouts[newCalloutID].pedChanceToObtainWeapons = callout.pedChanceToObtainWeapons
-    Config.Callouts[newCalloutID].pedChanceToAttackPlayer = callout.pedChanceToAttackPlayer
-    Config.Callouts[newCalloutID].pedChanceToSurrender = callout.pedChanceToSurrender
+    Config.Callouts[newCalloutID].CalloutLocations = callout.data.CalloutLocations
+    Config.Callouts[newCalloutID].PedWeaponData = callout.data.PedWeaponData
+    Config.Callouts[newCalloutID].PedActionOnNoActionFound = callout.data.PedActionOnNoActionFound
+    Config.Callouts[newCalloutID].PedChanceToFleeFromPlayer = callout.data.PedChanceToFleeFromPlayer
+    Config.Callouts[newCalloutID].PedChanceToObtainWeapons = callout.data.PedChanceToObtainWeapons
+    Config.Callouts[newCalloutID].PedChanceToAttackPlayer = callout.data.PedChanceToAttackPlayer
+    Config.Callouts[newCalloutID].PedChanceToSurrender = callout.data.PedChanceToSurrender
     local returnData = {
         calloutId = newCalloutID,
-        unitType = Config.Callouts[newCalloutID].unitType,
     }
     return returnData
 end)

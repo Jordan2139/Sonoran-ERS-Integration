@@ -12,4 +12,11 @@ CreateThread(function() Config.LoadPlugin("ersintegration", function(pluginConfi
     RegisterNetEvent('night_ers:receiveVehicleInformation', function(_, data)
         TriggerServerEvent('SonoranCAD::ErsIntegration::BuildVehs', data)
     end)
+    RegisterNetEvent('SonoranCAD::ErsIntegration::RequestCallout', function(calloutID)
+        local type = exports['night_ers']:getPlayerActiveServiceType()
+        local onShift = exports['night_ers']:getIsPlayerOnShift()
+        if onShift and type ~= nil then
+            TriggerServerEvent('night_ers:requestCallout', type, calloutID)
+        end
+    end)
 end) end)

@@ -12,6 +12,7 @@ if pluginConfig.enabled then
     RegisterNetEvent('SonoranCAD::ErsIntegration::CalloutAccepted')
     RegisterNetEvent('SonoranCAD::ErsIntegration::BuildChars')
     RegisterNetEvent('SonoranCAD::ErsIntegration::BuildVehs')
+    registerApiType('SET_AVAILABLE_CALLOUTS', 'emergency')
     local processedCalloutOffered = {}
     local processedCalloutAccepted = {}
     local processedPedData = {}
@@ -245,15 +246,24 @@ if pluginConfig.enabled then
         debugPrint('Loading ERS Callouts...')
         local calloutData = exports.night_ers.getCallouts()
         for uid, callout in pairs(calloutData) do
+            -- Retain only the first description if it exists, otherwise set to an empty table
+            if callout.CalloutDescriptions and #callout.CalloutDescriptions > 0 then
+                callout.CalloutDescriptions = { callout.CalloutDescriptions[1] }
+            else
+                callout.CalloutDescriptions = {}
+            end
+
+            -- Set CalloutLocations to an empty array
+            callout.CalloutLocations = {}
+
             local data = {}
             data.id = uid
             data.data = callout
             table.insert(ersCallouts, data)
-
         end
         local data = {
             ['serverId'] = Config.serverId,
-            ['callouts'] = {ersCallouts}
+            ['callouts'] = ersCallouts
         }
         debugPrint('Loaded ' .. #ersCallouts .. ' ERS callouts.')
         performApiRequest(data, 'SET_AVAILABLE_CALLOUTS', function(response)
@@ -263,12 +273,16 @@ if pluginConfig.enabled then
     --[[
         PUSH EVENT HANDLER
     ]]
-    TriggerServerEvent('SonoranCAD::RegisterPushEvent', 'EVENT_NEW_CALLOUT', function(data)
+    TriggerEvent('SonoranCAD::RegisterPushEvent', 'EVENT_NEW_CALLOUT', function(data)
         local calloutData = data.data
-        local calloutID = exports.night_ers:createCallout(calloutData)
+        local locations = vec3(calloutData.callout.data.CalloutLocations[1].X, calloutData.callout.data.CalloutLocations[1].Y, 41.0)
+        calloutData.callout.data.CalloutLocations = {[1] = vector3(locations.x, locations.y, locations.z)}
+        local calloutID = exports.night_ers:createCallout(calloutData.callout)
+        calloutData.callout.newId = calloutID.calloutId
+        TriggerClientEvent('SonoranCAD::ErsIntegration::BuildCallout', -1, calloutData.callout)
         if calloutID then
-            debugPrint("Callout " .. calloutID .. " created.")
-            TriggerEvent('night_ers:requestCallout', calloutID.unitType, calloutID.calloutId)
+            debugPrint("Callout " .. calloutID.calloutId .. " created.")
+            TriggerClientEvent('SonoranCAD::ErsIntegration::RequestCallout', -1, calloutID.calloutId)
         else
             debugPrint("Failed to create callout.")
         end

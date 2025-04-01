@@ -48,6 +48,19 @@ function OnEndedACallout() -- Contains no callout data.
 
 end
 
+RegisterNetEvent('SonoranCAD::ErsIntegration::BuildCallout', function(callout)
+    local newCalloutID = callout.newId
+    Config.Callouts[newCalloutID] = Config.Callouts[callout.id]
+    Config.Callouts[newCalloutID].id = newCalloutID
+    Config.Callouts[newCalloutID].CalloutLocations = callout.data.CalloutLocations
+    Config.Callouts[newCalloutID].PedWeaponData = callout.data.PedWeaponData
+    Config.Callouts[newCalloutID].PedActionOnNoActionFound = callout.data.PedActionOnNoActionFound
+    Config.Callouts[newCalloutID].PedChanceToFleeFromPlayer = callout.data.PedChanceToFleeFromPlayer
+    Config.Callouts[newCalloutID].PedChanceToObtainWeapons = callout.data.PedChanceToObtainWeapons
+    Config.Callouts[newCalloutID].PedChanceToAttackPlayer = callout.data.PedChanceToAttackPlayer
+    Config.Callouts[newCalloutID].PedChanceToSurrender = callout.data.PedChanceToSurrender
+end)
+
 function OnNPCGivesGear(data, clothingIndex)
     -- Adjust this to another framework for example if you like.
     local clothingData, healthData = data.ClothingData, data.HealthData
